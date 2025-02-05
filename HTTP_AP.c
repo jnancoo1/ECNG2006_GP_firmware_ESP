@@ -15,7 +15,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_http_server.h"
-
+#include "driver/gpio.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
@@ -29,6 +29,9 @@
 #define EXAMPLE_MAX_STA_CONN       10
 
 static const char *TAG = "wifi softAP";
+const char *to_print="This is the first Messagge You will See \n";
+int a=10;
+
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                     int32_t event_id, void* event_data)
@@ -43,7 +46,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                  MAC2STR(event->mac), event->aid);
     }
 }
-
+int b=500;
 void wifi_init_softap()
 {
     tcpip_adapter_init();
@@ -78,17 +81,53 @@ void wifi_init_softap()
 esp_err_t root_get_handler(httpd_req_t *req)
 {
     const char *response = "<!DOCTYPE html>"
-                           "<html>"
-                           "<head><title>ECNG 2006 Group Project Reporting</title></head>"
-                           "<body>"
-                           "<h1>Good day</h1>"
-                           "<p>Your uploaded sensor readings will be displayed.</p>"
-                           "</body>"
-                           "</html>";
+                       "<html>"
+                       "<head><title>ECNG 2006 Group Project Reporting</title></head>"
+                       "<script>"
+
+                       "function fetchEvent() {"
+  "fetch('/event')"  // Send an HTTP GET request to the "/event" endpoint
+    ".then(response => response.json()) " // Parse the response as JSON
+    ".then(data => {"  
+      // Access the event and sensor data from the JSON response
+      "document.getElementById('sensor-data').innerText = 'Sensor Data:' + data.sensor_data;"
+    "})"
+    ".catch(error => console.error('Error fetching event:', error));"  // Handle errors
+"}"
+
+// Call the `fetchEvent` function every 5 seconds (5000 milliseconds)
+"setInterval(fetchEvent, 5000);"
+                       "</script>"
+                       "</head>"
+                       "<body>"
+                       "<h1>Good day</h1>"
+                       "<p>Your uploaded sensor readings will be displayed .</p>"
+                       "<div id='sensor-data'>This will disappear on successful upload</div>"
+                       "</body>"
+                       "</html>";
+
     httpd_resp_send(req, response, HTTPD_MAX_URI_LEN);
     return ESP_OK;
 }
 
+esp_err_t event_get_handler(httpd_req_t *req)
+{
+    
+    ESP_LOGI(TAG, "Event");
+
+    char event_data[100];
+    snprintf(event_data, sizeof(event_data), "{\"event\": \"New sensor data available!\", \"sensor_data\": %d}", a);
+    
+    ESP_LOGI(TAG, "UPDATED");
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
+    httpd_resp_send(req, event_data, strlen(event_data));
+    ESP_LOGI(TAG, "Done");
+
+    return ESP_OK;
+}
 
 httpd_handle_t start_webserver(void)
 {
@@ -104,6 +143,15 @@ httpd_handle_t start_webserver(void)
             .user_ctx  = NULL
         };
         httpd_register_uri_handler(server, &root_uri);
+
+        httpd_uri_t event_uri = {
+        .uri       = "/event",
+        .method    = HTTP_GET,
+        .handler   = event_get_handler,
+        .user_ctx  = NULL
+};
+httpd_register_uri_handler(server, &event_uri);
+
     } else {
         ESP_LOGE(TAG, "Failed to start HTTP server");
     }
@@ -120,4 +168,30 @@ void app_main()
 
   start_webserver();
 
+    gpio_config_t config1;
+    config1.mode=GPIO_MODE_DEF_INPUT;
+    config1.pin_bit_mask=(1ULL<<GPIO_NUM_0);
+    config1.intr_type = GPIO_INTR_DISABLE;
+    config1.pull_down_en = 0;
+    config1.pull_down_en = 0;
+    gpio_config(&config1);
+    int f=0;
+    while(1){
+        f=gpio_get_level(GPIO_NUM_0);
+        if(f==0){
+            a+=10;
+            //*response="The Button Is Pressed";
+
+            vTaskDelay(10000 / portTICK_PERIOD_MS);
+
+        }
+        else{
+            
+            a+=10;
+            //*response="The Button Is Not Pressed";
+            printf("None\n");
+            vTaskDelay(10000 / portTICK_PERIOD_MS);
+        }
+       
+    }
 }
