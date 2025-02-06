@@ -27,11 +27,15 @@
 #define EXAMPLE_ESP_WIFI_SSID      "CONFIG_ESP_WIFI_SSID"
 #define EXAMPLE_ESP_WIFI_PASS      "CONFIG_ESP_WIFI_PASSWORD"
 #define EXAMPLE_MAX_STA_CONN       10
+#define UART_NUM                   UART_NUM_0
+#define BUF_SIZE                   1024
+
 
 static const char *TAG = "wifi softAP";
 const char *to_print="This is the first Messagge You will See \n";
 int a=10;
 
+const char *button_message="a";
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                     int32_t event_id, void* event_data)
@@ -116,7 +120,7 @@ esp_err_t event_get_handler(httpd_req_t *req)
     ESP_LOGI(TAG, "Event");
 
     char event_data[100];
-    snprintf(event_data, sizeof(event_data), "{\"event\": \"New sensor data available!\", \"sensor_data\": %d}", a);
+    snprintf(event_data, sizeof(event_data), "{\"event\": \"New sensor data available!\", \"sensor_data\": \"%s\"}", button_message);
     
     ESP_LOGI(TAG, "UPDATED");
 
@@ -161,6 +165,25 @@ httpd_register_uri_handler(server, &event_uri);
 
 void app_main()
 {
+
+
+      uart_config_t uart_config = {
+        .baud_rate = 1200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    };
+
+    uart_driver_install(UART_NUM, BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM, &uart_config);
+
+    uint8_t *data = (uint8_t *)malloc(BUF_SIZE);
+    uint8_t buffer[BUF_SIZE]; // Buffer to store extracted message
+    int buffer_index = 0;
+    bool recording = false; 
+
+
     ESP_ERROR_CHECK(nvs_flash_init());
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_AP");
@@ -178,20 +201,60 @@ void app_main()
     int f=0;
     while(1){
         f=gpio_get_level(GPIO_NUM_0);
+        free(buffer);
         if(f==0){
             a+=10;
-            //*response="The Button Is Pressed";
-
+            button_message="The Button Is Pressed";
+            printf("here\n");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
 
         }
         else{
-            
+            printf("here2 \n");
+
             a+=10;
-            //*response="The Button Is Not Pressed";
+            button_message="The Button Is Not Pressed";
             printf("None\n");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
         }
-       
+
+
+
+        int len = uart_read_bytes(UART_NUM, data, BUF_SIZE - 1, 100 / portTICK_PERIOD_MS);
+        if (len > 0) {
+            data[len] = '\0'; // Null-terminate received data
+
+            for (int i = 0; i < len; i++) {
+                if (!recording) {
+                    // Detect "aa" start sequence
+                    if (i < len - 1 && data[i] == 'a' && data[i + 1] == 'a') {
+                        recording = true;
+                        buffer_index = 0;
+                        i++; // Skip the next 'a'
+                        continue;
+                    }
+                } else {
+                    // Detect "xx" end sequence
+                    if (i < len - 1 && data[i] == 'x' && data[i + 1] == 'x') {
+                        buffer[buffer_index] = '\0'; // Null-terminate buffer
+                        printf("Extracted Message: %s\n", buffer);
+                        recording = false;
+                        buffer_index = 0;
+                        i++; // Skip the next 'x'
+                        continue;
+                    }
+
+                    // Store character in buffer
+                    if (buffer_index < BUF_SIZE - 1) {
+                        buffer[buffer_index++] = data[i];
+                    }
+                }
+            }
+        }
+
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
-}
+
+    free(data);
+
+    }  
