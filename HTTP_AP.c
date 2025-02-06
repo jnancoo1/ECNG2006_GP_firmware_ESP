@@ -16,6 +16,8 @@
 #include "nvs_flash.h"
 #include "esp_http_server.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"
+
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
@@ -183,7 +185,6 @@ void app_main()
     int buffer_index = 0;
     bool recording = false; 
 
-
     ESP_ERROR_CHECK(nvs_flash_init());
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_AP");
@@ -201,10 +202,10 @@ void app_main()
     int f=0;
     while(1){
         f=gpio_get_level(GPIO_NUM_0);
-        free(buffer);
         if(f==0){
             a+=10;
-            button_message="The Button Is Pressed";
+            const char *tosend=(const char*) buffer;
+            button_message=tosend ;
             printf("here\n");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
 
@@ -213,11 +214,14 @@ void app_main()
             printf("here2 \n");
 
             a+=10;
-            button_message="The Button Is Not Pressed";
+            const char *tosend=(const char*) buffer;
+
+            button_message=tosend;
             printf("None\n");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
         }
 
+        free(buffer);
 
 
         int len = uart_read_bytes(UART_NUM, data, BUF_SIZE - 1, 100 / portTICK_PERIOD_MS);
