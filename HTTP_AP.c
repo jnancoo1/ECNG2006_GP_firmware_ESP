@@ -26,11 +26,13 @@
    If you'd rather not, just change the below entries to strings with
    the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
 */
-#define EXAMPLE_ESP_WIFI_SSID      "CONFIG_ESP_WIFI_SSID"
-#define EXAMPLE_ESP_WIFI_PASS      "CONFIG_ESP_WIFI_PASSWORD"
+#define EXAMPLE_ESP_WIFI_SSID      "Group_M3"
+#define EXAMPLE_ESP_WIFI_PASS      "Password"
 #define EXAMPLE_MAX_STA_CONN       10
 #define UART_NUM                   UART_NUM_0
 #define BUF_SIZE                   1024
+#define GPIO_OUTPUT_IO_2           GPIO_NUM_2  // GPIO2
+#define GPIO_OUTPUT_PIN_SEL        (1ULL << GPIO_OUTPUT_IO_2)
 
 
 static const char *TAG = "wifi softAP";
@@ -184,6 +186,17 @@ void app_main()
     uint8_t buffer[BUF_SIZE]; // Buffer to store extracted message
     int buffer_index = 0;
     bool recording = false; 
+
+    gpio_config_t io_conf = {
+        .pin_bit_mask = GPIO_OUTPUT_PIN_SEL, // Set GPIO2
+        .mode = GPIO_MODE_DEF_OUTPUT,            // Set as output mode
+        .pull_up_en = GPIO_PULLUP_DISABLE ,    // Enable pull-up
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE       // No interrupts
+    };
+    gpio_config(&io_conf);
+
+    gpio_set_level(GPIO_OUTPUT_IO_2, 1); // Set GPIO2 to HIGH
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
